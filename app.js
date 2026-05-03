@@ -1,38 +1,33 @@
-// ─── API Key management ───────────────────────────────────────────────────────
+// ── API Key ──────────────────────────────────────────────────────────────────
 function getApiKey() { return localStorage.getItem('anthropic_api_key') || ''; }
-function saveApiKey(key) { localStorage.setItem('anthropic_api_key', key.trim()); }
-
+function saveApiKey(k) { localStorage.setItem('anthropic_api_key', k.trim()); }
 function checkApiKey() {
-  const key = getApiKey();
-  document.getElementById('api-key-banner').style.display = key ? 'none' : '';
-  document.getElementById('main-content').style.display   = key ? ''     : 'none';
+  const ok = !!getApiKey();
+  document.getElementById('api-key-banner').style.display = ok ? 'none' : '';
+  document.getElementById('main-content').style.display   = ok ? ''     : 'none';
 }
-
 function submitApiKey() {
-  const val = document.getElementById('api-key-input').value.trim();
-  if (!val.startsWith('sk-ant-')) {
-    document.getElementById('api-key-error').textContent =
-      "That doesn't look like an Anthropic key (should start with sk-ant-).";
+  const v = document.getElementById('api-key-input').value.trim();
+  if (!v.startsWith('sk-ant-')) {
+    document.getElementById('api-key-error').textContent = "Doesn't look right — key should start with sk-ant-";
     return;
   }
-  saveApiKey(val);
-  checkApiKey();
+  saveApiKey(v); checkApiKey();
 }
-
 function clearApiKey() { localStorage.removeItem('anthropic_api_key'); checkApiKey(); }
 window.addEventListener('DOMContentLoaded', checkApiKey);
 
-// ─── Chip state ───────────────────────────────────────────────────────────────
+// ── Chips ────────────────────────────────────────────────────────────────────
 const chipState = {};
-function toggleChip(el, group) {
-  if (!chipState[group]) chipState[group] = new Set();
+function toggleChip(el, g) {
+  if (!chipState[g]) chipState[g] = new Set();
   el.classList.contains('on')
-    ? (el.classList.remove('on'), chipState[group].delete(el.textContent))
-    : (el.classList.add('on'),    chipState[group].add(el.textContent));
+    ? (el.classList.remove('on'), chipState[g].delete(el.textContent))
+    : (el.classList.add('on'),    chipState[g].add(el.textContent));
 }
-function getChips(group) { return chipState[group] ? [...chipState[group]].join(', ') : ''; }
+function getChips(g) { return chipState[g] ? [...chipState[g]].join(', ') : ''; }
 
-// ─── Tab switching ────────────────────────────────────────────────────────────
+// ── Tabs ─────────────────────────────────────────────────────────────────────
 function switchTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
@@ -40,15 +35,8 @@ function switchTab(name, btn) {
     document.getElementById('tab-'+t).style.display = t === name ? '' : 'none');
 }
 
-// ─── Loading state ────────────────────────────────────────────────────────────
-function setLoading(btnId, loading, label) {
-  const btn = document.getElementById(btnId);
-  btn.disabled = loading;
-  btn.innerHTML = loading ? '<span class="spinner"></span>Generating...' : label;
-}
-
-// ─── Claude API call ──────────────────────────────────────────────────────────
-async function callClaude(system, userPrompt) {
+// ── Claude call ──────────────────────────────────────────────────────────────
+async function callClaude(system, prompt) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -57,312 +45,327 @@ async function callClaude(system, userPrompt) {
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5',
-      max_tokens: 2000,
-      system,
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
+    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 2000, system, messages: [{ role: 'user', content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   return data.content?.find(b => b.type === 'text')?.text || '';
 }
 
-// ─── Diet plan ────────────────────────────────────────────────────────────────
-async function generateDiet() {
-  const age      = document.getElementById('d-age').value;
-  const weight   = document.getElementById('d-weight').value;
-  const height   = document.getElementById('d-height').value;
-  const gender   = document.getElementById('d-gender').value;
-  const activity = document.getElementById('d-activity').value;
-  const goal     = getChips('d-goal');
-  const pref     = getChips('d-pref');
-  const allergies = document.getElementById('d-allergies').value;
-
-  const out = document.getElementById('diet-output');
-  out.className = 'output loading';
-  out.innerHTML = 'Building your meal plan...';
-  setLoading('diet-btn', true);
-
-  try {
-    const sys = `You are a certified nutritionist. Respond in clean markdown only.
-Use ## for each day heading (e.g. ## Day 1 — Monday).
-For each day, output a markdown table with columns: Meal | Details | Calories.
-End with a ## Tips section as a bullet list. No extra commentary.
-Use Indian-friendly foods.`;
-
-    const prompt = `Create a 7-day diet plan for:
-- Age: ${age||'N/A'}, Weight: ${weight||'N/A'} kg, Height: ${height||'N/A'} cm, Gender: ${gender||'N/A'}
-- Activity: ${activity||'moderate'}, Goal: ${goal||'general health'}
-- Preferences: ${pref||'none'}, Avoid: ${allergies||'none'}
-
-For each day include: Breakfast, Mid-morning snack, Lunch, Afternoon snack, Dinner.
-Add a Total Calories row at the bottom of each table.`;
-
-    const text = await callClaude(sys, prompt);
-    out.className = 'output';
-    out.innerHTML = marked.parse(text);
-  } catch(e) {
-    out.className = 'output';
-    out.textContent = 'Error: ' + e.message;
-  }
-  setLoading('diet-btn', false, 'Generate my diet plan');
+function parseJSON(raw) {
+  return JSON.parse(raw.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim());
 }
 
-// ─── Workout plan — JSON from Claude → table render ───────────────────────────
-async function generateWorkout() {
-  const age    = document.getElementById('w-age').value;
-  const weight = document.getElementById('w-weight').value;
-  const level  = document.getElementById('w-level').value;
-  const days   = document.getElementById('w-days').value;
-  const goal   = getChips('w-goal');
-  const equip  = getChips('w-equip');
-  const injury = document.getElementById('w-injury').value;
-
-  const planEl = document.getElementById('workout-plan');
-  planEl.style.display = 'none';
-  planEl.innerHTML = '';
-  setLoading('workout-btn', true);
-
-  const sys = `You are a certified personal trainer. Always respond with ONLY valid JSON — no markdown, no explanation.`;
+// ── Generate Diet Plan ───────────────────────────────────────────────────────
+async function generateDiet() {
+  const btn = document.getElementById('diet-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating…';
+  document.getElementById('diet-plan').style.display  = 'none';
+  document.getElementById('diet-empty').style.display = '';
+  document.getElementById('diet-empty').textContent   = 'Building your 7-day meal plan…';
 
   const schema = `{
-  "split": "e.g. Push/Pull/Legs",
-  "goal": "...",
-  "days": [
-    {
-      "day": "Day 1",
-      "title": "Push — Chest & Shoulders",
-      "focus": "Chest, Shoulders, Triceps",
-      "warmup": "5 min light cardio + arm circles",
-      "exercises": [
-        { "name": "Bench Press", "sets": 4, "reps": "8-10", "rest": "90s", "tip": "Keep shoulder blades retracted" }
-      ],
-      "cooldown": "5 min static stretching"
-    }
-  ],
-  "form_tips": [
-    { "exercise": "Squat", "tip": "Keep chest tall, knees tracking over toes" }
-  ],
+  "goal": "...", "daily_calories": 1800, "protein_g": 140, "carbs_g": 180, "fat_g": 60,
+  "days": [{
+    "day": "Day 1", "title": "Monday",
+    "meals": [
+      { "meal": "Breakfast", "time": "8:00 AM", "items": "...", "calories": 380, "protein": "15g", "carbs": "50g", "fat": "10g" },
+      { "meal": "Mid-morning", "time": "11:00 AM", "items": "...", "calories": 150, "protein": "4g", "carbs": "20g", "fat": "5g" },
+      { "meal": "Lunch", "time": "1:00 PM", "items": "...", "calories": 500, "protein": "35g", "carbs": "55g", "fat": "15g" },
+      { "meal": "Snack", "time": "4:30 PM", "items": "...", "calories": 180, "protein": "8g", "carbs": "20g", "fat": "6g" },
+      { "meal": "Dinner", "time": "7:30 PM", "items": "...", "calories": 450, "protein": "30g", "carbs": "40g", "fat": "14g" }
+    ],
+    "total_calories": 1660, "water": "10 glasses"
+  }],
+  "tips": ["tip 1", "tip 2", "tip 3", "tip 4"]
+}`;
+
+  try {
+    const text = await callClaude(
+      'You are a certified nutritionist. Respond ONLY with valid JSON matching the schema. No markdown fences, no extra text. Use Indian-friendly foods.',
+      `Create a 7-day diet plan for:
+Age: ${document.getElementById('d-age').value||'N/A'}, Weight: ${document.getElementById('d-weight').value||'N/A'}kg,
+Height: ${document.getElementById('d-height').value||'N/A'}cm, Gender: ${document.getElementById('d-gender').value||'N/A'},
+Activity: ${document.getElementById('d-activity').value||'moderate'}, Goal: ${getChips('d-goal')||'general health'},
+Preferences: ${getChips('d-pref')||'none'}, Avoid: ${document.getElementById('d-allergies').value||'none'}.
+Schema: ${schema}`
+    );
+    const plan = parseJSON(text);
+    renderDietPlan(plan);
+    document.getElementById('diet-empty').style.display = 'none';
+    document.getElementById('diet-plan').style.display  = '';
+  } catch(e) {
+    document.getElementById('diet-empty').textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Generate Diet Plan';
+}
+
+// ── Render Diet Plan ─────────────────────────────────────────────────────────
+function renderDietPlan(plan) {
+  const wrap = document.getElementById('diet-pdf-content');
+
+  let html = `<div class="plan-summary">
+    <div class="sum-card"><div class="sum-val">${plan.daily_calories||'—'}</div><div class="sum-lbl">Target kcal/day</div></div>
+    <div class="sum-card"><div class="sum-val">${plan.protein_g||'—'}g</div><div class="sum-lbl">Protein</div></div>
+    <div class="sum-card"><div class="sum-val">${plan.carbs_g||'—'}g</div><div class="sum-lbl">Carbs</div></div>
+  </div>`;
+
+  (plan.days||[]).forEach(d => {
+    html += `<div class="day-card">
+      <div class="day-hdr">
+        <span class="day-badge">${d.day}</span>
+        <span class="day-title">${d.title||''}</span>
+        <span class="day-sub">Water: ${d.water||'8 glasses'}</span>
+      </div>
+      <div class="day-body">
+        <table class="plan-table">
+          <thead><tr>
+            <th style="width:18%">Meal</th>
+            <th style="width:38%">What to eat</th>
+            <th style="width:10%">Protein</th>
+            <th style="width:10%">Carbs</th>
+            <th style="width:10%">Fat</th>
+            <th style="width:12%">Kcal</th>
+          </tr></thead>
+          <tbody>`;
+
+    (d.meals||[]).forEach(m => {
+      html += `<tr>
+        <td><span class="meal-name">${m.meal}</span><span class="meal-time">${m.time||''}</span></td>
+        <td class="meal-items">${m.items}</td>
+        <td class="meal-macro">${m.protein||'—'}</td>
+        <td class="meal-macro">${m.carbs||'—'}</td>
+        <td class="meal-macro">${m.fat||'—'}</td>
+        <td class="meal-cal">${m.calories||'—'}</td>
+      </tr>`;
+    });
+
+    html += `</tbody>
+          <tfoot><tr class="total-row">
+            <td colspan="5">Total</td>
+            <td>${d.total_calories||'—'} kcal</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  if (plan.tips?.length) {
+    html += `<div class="tips-section"><div class="tips-heading">Nutrition tips</div><div class="tips-grid">`;
+    plan.tips.forEach((t,i) => {
+      html += `<div class="tip-card"><div class="tip-num">Tip ${i+1}</div><p>${t}</p></div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  wrap.innerHTML = html;
+}
+
+// ── Generate Workout Plan ────────────────────────────────────────────────────
+async function generateWorkout() {
+  const btn = document.getElementById('workout-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating…';
+  document.getElementById('workout-plan-pdf').style.display = 'none';
+  document.getElementById('workout-empty').style.display    = '';
+  document.getElementById('workout-empty').textContent      = 'Building your workout split…';
+
+  const schema = `{
+  "split": "Push/Pull/Legs", "goal": "...", "days_per_week": 4,
+  "days": [{
+    "day": "Day 1", "title": "Push — Chest & Shoulders", "focus": "Chest, Shoulders, Triceps",
+    "warmup": "5 min light cardio + arm circles",
+    "exercises": [
+      { "name": "Bench Press", "sets": 4, "reps": "8-10", "rest": "90s", "tip": "Keep shoulder blades retracted" }
+    ],
+    "cooldown": "5 min static stretching"
+  }],
+  "form_tips": [{ "exercise": "Squat", "tip": "Keep chest tall, knees tracking over toes" }],
   "overload_tip": "Add 2.5kg or 1 extra rep each week on main lifts."
 }`;
 
-  const prompt = `Create a ${days||4}-day/week workout plan for:
-- Age: ${age||'N/A'}, Weight: ${weight||'N/A'} kg
-- Level: ${level||'intermediate'}, Goal: ${goal||'general fitness'}
-- Equipment: ${equip||'full gym'}, Injuries: ${injury||'none'}
-
-Respond ONLY with JSON matching this schema (no extra fields, no markdown):
-${schema}`;
-
   try {
-    const raw  = await callClaude(sys, prompt);
-    const json = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    renderWorkoutPlan(json);
-    planEl.style.display = '';
+    const text = await callClaude(
+      'You are a certified personal trainer. Respond ONLY with valid JSON matching the schema. No markdown, no extra text.',
+      `Create a ${document.getElementById('w-days').value||4}-day/week workout plan for:
+Age: ${document.getElementById('w-age').value||'N/A'}, Weight: ${document.getElementById('w-weight').value||'N/A'}kg,
+Level: ${document.getElementById('w-level').value||'intermediate'}, Goal: ${getChips('w-goal')||'general fitness'},
+Equipment: ${getChips('w-equip')||'full gym'}, Injuries: ${document.getElementById('w-injury').value||'none'}.
+Schema: ${schema}`
+    );
+    const plan = parseJSON(text);
+    renderWorkoutPlan(plan);
+    document.getElementById('workout-empty').style.display    = 'none';
+    document.getElementById('workout-plan-pdf').style.display = '';
   } catch(e) {
-    planEl.style.display = '';
-    planEl.innerHTML = `<div class="output">${e.message}<br><br>Raw: ${e.raw||''}</div>`;
+    document.getElementById('workout-empty').textContent = 'Error: ' + e.message;
   }
-  setLoading('workout-btn', false, 'Generate my workout plan');
+  btn.disabled = false;
+  btn.textContent = 'Generate Workout Plan';
 }
 
-// ─── Render workout plan as tables ───────────────────────────────────────────
+// ── Render Workout Plan ──────────────────────────────────────────────────────
 function renderWorkoutPlan(plan) {
-  const el = document.getElementById('workout-plan');
+  const wrap = document.getElementById('workout-pdf-content');
 
-  // Header row
-  let html = `<div class="plan-header">
-    <div>
-      <div class="plan-title">${plan.split || 'Weekly Plan'}</div>
-      <div class="plan-meta">Goal: ${plan.goal || '—'}</div>
-    </div>
+  let html = `<div class="plan-summary">
+    <div class="sum-card"><div class="sum-val">${plan.days_per_week||'—'}</div><div class="sum-lbl">Days / week</div></div>
+    <div class="sum-card"><div class="sum-val">${plan.split||'—'}</div><div class="sum-lbl">Split type</div></div>
+    <div class="sum-card"><div class="sum-val">${plan.goal||'—'}</div><div class="sum-lbl">Goal</div></div>
   </div>`;
 
-  // Day cards
-  (plan.days || []).forEach((d, i) => {
+  (plan.days||[]).forEach(d => {
     html += `<div class="day-card">
-      <div class="day-header">
-        <span class="day-badge">${d.day || 'Day '+(i+1)}</span>
-        <span class="day-title">${d.title || ''}</span>
-        <span class="day-focus">${d.focus || ''}</span>
+      <div class="day-hdr">
+        <span class="day-badge">${d.day}</span>
+        <span class="day-title">${d.title||''}</span>
+        <span class="day-sub">${d.focus||''}</span>
       </div>
-      <div class="day-body">`;
+      <div class="day-body">
+        ${d.warmup ? `<div class="warmup-bar"><span class="bar-label">Warm-up</span><span>${d.warmup}</span></div>` : ''}
+        <table class="plan-table">
+          <thead><tr>
+            <th style="width:32%">Exercise</th>
+            <th style="width:10%">Sets</th>
+            <th style="width:14%">Reps</th>
+            <th style="width:12%">Rest</th>
+            <th>Coach tip</th>
+          </tr></thead>
+          <tbody>`;
 
-    if (d.warmup) html += `<div class="warmup-row"><span>Warm-up</span><span>${d.warmup}</span></div>`;
-
-    // Exercise table
-    html += `<table class="ex-table">
-      <thead><tr>
-        <th style="width:30%">Exercise</th>
-        <th style="width:10%">Sets</th>
-        <th style="width:14%">Reps</th>
-        <th style="width:12%">Rest</th>
-        <th>Coach tip</th>
-      </tr></thead>
-      <tbody>`;
-
-    (d.exercises || []).forEach(ex => {
+    (d.exercises||[]).forEach(ex => {
       html += `<tr>
         <td class="ex-name">${ex.name}</td>
         <td class="ex-sets">${ex.sets}</td>
         <td class="ex-reps">${ex.reps}</td>
         <td class="ex-rest">${ex.rest}</td>
-        <td class="ex-tip">${ex.tip || ''}</td>
+        <td class="ex-tip">${ex.tip||''}</td>
       </tr>`;
     });
 
-    html += `</tbody></table>`;
-    if (d.cooldown) html += `<div class="cooldown-row"><span>Cool-down</span><span>${d.cooldown}</span></div>`;
-    html += `</div></div>`; // close day-body + day-card
+    html += `</tbody></table>
+        ${d.cooldown ? `<div class="cooldown-bar"><span class="bar-label">Cool-down</span><span>${d.cooldown}</span></div>` : ''}
+      </div>
+    </div>`;
   });
 
-  // Progressive overload tip
   if (plan.overload_tip) {
-    html += `<div class="overload-box"><strong>Progressive overload tip</strong>${plan.overload_tip}</div>`;
+    html += `<div class="overload-box"><div class="ob-label">Progressive overload tip</div>${plan.overload_tip}</div>`;
   }
 
-  // Form tips grid
-  if (plan.form_tips && plan.form_tips.length) {
-    html += `<div class="section-label" style="margin-top:1.25rem;">Form tips</div>
-      <div class="tips-grid">`;
+  if (plan.form_tips?.length) {
+    html += `<div class="form-tips-grid">`;
     plan.form_tips.forEach(t => {
-      html += `<div class="tip-card">
-        <div class="tip-ex">${t.exercise}</div>
-        <div class="tip-text">${t.tip}</div>
-      </div>`;
+      html += `<div class="ftip-card"><div class="ftip-ex">${t.exercise}</div><div class="ftip-text">${t.tip}</div></div>`;
     });
     html += `</div>`;
   }
 
-  el.innerHTML = html;
+  wrap.innerHTML = html;
 }
 
-// ─── PDF download ─────────────────────────────────────────────────────────────
-function downloadPDF() {
-  // Figure out which tab is active and grab the right content element
-  const isDiet    = document.getElementById('tab-diet').style.display    !== 'none';
-  const isWorkout = document.getElementById('tab-workout').style.display !== 'none';
-
-  const contentEl = isDiet    ? document.getElementById('diet-output')
-                  : isWorkout ? document.getElementById('workout-plan')
-                  : null;
-
-  if (!contentEl || contentEl.classList.contains('empty') || !contentEl.innerHTML.trim()) {
-    alert('Generate a plan first, then download.');
-    return;
-  }
-
-  const filename = isDiet ? 'diet-plan.pdf' : 'workout-plan.pdf';
-
-  // Clone so we can inject print-friendly styles without affecting the live UI
-  const clone = contentEl.cloneNode(true);
-  clone.style.cssText = 'font-family:-apple-system,sans-serif;font-size:13px;color:#1a1a1a;padding:8px;';
-
-  // Inline critical styles for tables (html2pdf renders in a headless context, CSS vars won't resolve)
-  clone.querySelectorAll('table').forEach(t => {
-    t.style.cssText = 'width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;';
-  });
-  clone.querySelectorAll('thead tr').forEach(tr => {
-    tr.style.cssText = 'background:#0F172A;color:#fff;';
-  });
-  clone.querySelectorAll('th').forEach(th => {
-    th.style.cssText = 'padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;';
-  });
-  clone.querySelectorAll('tbody tr').forEach((tr, i) => {
-    tr.style.cssText = `border-bottom:1px solid #e5e3df;background:${i % 2 === 0 ? '#fff' : '#f8f7f5'};`;
-  });
-  clone.querySelectorAll('td').forEach(td => {
-    td.style.cssText = 'padding:8px 10px;vertical-align:top;';
-  });
-  clone.querySelectorAll('td:first-child').forEach(td => {
-    td.style.cssText = 'padding:8px 10px;vertical-align:top;font-weight:700;color:#C13E06;';
-  });
-  clone.querySelectorAll('h2').forEach(h => {
-    h.style.cssText = 'font-size:14px;font-weight:700;color:#E8500A;text-transform:uppercase;letter-spacing:0.05em;margin:20px 0 6px;padding-bottom:5px;border-bottom:2px solid #FDF0EB;';
-  });
-  // Workout day cards
-  clone.querySelectorAll('.day-header').forEach(h => {
-    h.style.cssText = 'background:#0F172A;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;border-radius:8px 8px 0 0;';
-  });
-  clone.querySelectorAll('.day-badge').forEach(b => {
-    b.style.cssText = 'background:#E8500A;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;text-transform:uppercase;';
-  });
-  clone.querySelectorAll('.day-title').forEach(t => { t.style.cssText = 'font-size:13px;font-weight:600;color:#fff;'; });
-  clone.querySelectorAll('.day-focus').forEach(t => { t.style.cssText = 'font-size:11px;color:#aaa;margin-left:auto;'; });
-  clone.querySelectorAll('.day-card').forEach(c => {
-    c.style.cssText = 'border:1px solid #e5e3df;border-radius:10px;margin-bottom:14px;overflow:hidden;page-break-inside:avoid;';
-  });
-  clone.querySelectorAll('.day-body').forEach(b => { b.style.cssText = 'padding:0 14px 12px;'; });
-  clone.querySelectorAll('.ex-table').forEach(t => {
-    t.style.cssText = 'width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;';
-  });
-  clone.querySelectorAll('.ex-table thead th').forEach(th => {
-    th.style.cssText = 'text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:#555;text-transform:uppercase;border-bottom:2px solid #E8500A;';
-  });
-  clone.querySelectorAll('.ex-table tbody td').forEach(td => { td.style.cssText = 'padding:7px 8px;border-bottom:1px solid #e5e3df;font-size:12px;'; });
-  clone.querySelectorAll('.ex-name').forEach(t => { t.style.cssText = 'font-weight:700;color:#0F172A;padding:7px 8px;border-bottom:1px solid #e5e3df;'; });
-  clone.querySelectorAll('.ex-sets').forEach(t => { t.style.cssText = 'text-align:center;font-weight:700;color:#E8500A;padding:7px 8px;border-bottom:1px solid #e5e3df;'; });
-  clone.querySelectorAll('.warmup-row,.cooldown-row').forEach(r => {
-    r.style.cssText = 'font-size:11px;color:#555;padding:6px 0;border-bottom:1px solid #e5e3df;display:flex;gap:8px;';
-  });
-  clone.querySelectorAll('.overload-box').forEach(b => {
-    b.style.cssText = 'background:#FDF0EB;border:1px solid #f5c0a4;border-radius:8px;padding:10px 14px;font-size:12px;color:#C13E06;margin-top:6px;';
-  });
-  clone.querySelectorAll('.tips-grid').forEach(g => { g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;'; });
-  clone.querySelectorAll('.tip-card').forEach(c => {
-    c.style.cssText = 'background:#DCFCE7;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px;';
-  });
-  clone.querySelectorAll('.tip-ex').forEach(t => { t.style.cssText = 'font-size:10px;font-weight:700;color:#16A34A;text-transform:uppercase;margin-bottom:3px;'; });
-  clone.querySelectorAll('.tip-text').forEach(t => { t.style.cssText = 'font-size:11px;color:#166534;line-height:1.5;'; });
-
-  const opt = {
-    margin:      [10, 10, 10, 10],
-    filename,
-    image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:   { mode: ['avoid-all', 'css'] },
-  };
-
-  const btn = event.currentTarget;
-  btn.textContent = 'Generating...';
-  btn.disabled = true;
-
-  html2pdf().set(opt).from(clone).save().then(() => {
-    btn.textContent = 'Download PDF';
-    btn.disabled = false;
-  });
-}
-
-// ─── BMI calculator ───────────────────────────────────────────────────────────
+// ── BMI Calculator ───────────────────────────────────────────────────────────
 function calcBMI() {
-  const w       = parseFloat(document.getElementById('b-weight').value);
-  const hCm     = parseFloat(document.getElementById('b-height').value);
-  const age     = parseFloat(document.getElementById('b-age').value);
-  const gender  = document.getElementById('b-gender').value;
-  const actMult = parseFloat(document.getElementById('b-activity').value);
-  if (!w || !hCm) return;
+  const w = parseFloat(document.getElementById('b-weight').value);
+  const h = parseFloat(document.getElementById('b-height').value);
+  const age = parseFloat(document.getElementById('b-age').value);
+  const gender = document.getElementById('b-gender').value;
+  const act = parseFloat(document.getElementById('b-activity').value);
+  if (!w || !h) return;
 
-  const h   = hCm / 100;
-  const bmi = w / (h * h);
-  let bmr   = 10*w + 6.25*hCm - 5*(age||25) + (gender === 'Male' ? 5 : gender === 'Female' ? -161 : -78);
-  const tdee = actMult ? bmr * actMult : 0;
+  const bmi = w / ((h/100) ** 2);
+  const bmr = 10*w + 6.25*h - 5*(age||25) + (gender==='Male' ? 5 : gender==='Female' ? -161 : -78);
+  const tdee = act ? bmr * act : 0;
 
   document.getElementById('bmi-val').textContent  = bmi.toFixed(1);
   document.getElementById('bmr-val').textContent  = Math.round(bmr);
   document.getElementById('tdee-val').textContent = tdee ? Math.round(tdee) : '—';
 
-  const detail  = document.getElementById('bmi-detail');
-  const explain = document.getElementById('bmi-explain');
-  detail.style.display = '';
+  document.getElementById('bmi-detail').style.display = '';
+  const cats = bmi < 18.5 ? ['Underweight','Focus on a calorie surplus with nutrient-dense foods and strength training to build lean mass.']
+             : bmi < 25   ? ['Normal weight','You\'re in a healthy range. Keep up balanced nutrition and consistent training.']
+             : bmi < 30   ? ['Overweight','A moderate deficit (300–500 kcal/day) with cardio and strength training will help.']
+             :               ['Obese','Consult a doctor before starting. Low-impact exercise and structured nutrition is a great start.'];
+  document.getElementById('bmi-explain').textContent =
+    `BMI category: ${cats[0]}. ${cats[1]}${tdee ? ` Your TDEE is ${Math.round(tdee)} kcal/day — eat below this to lose weight, above to gain.` : ''}`;
+}
 
-  let cat, advice;
-  if      (bmi < 18.5) { cat='Underweight'; advice='Focus on a calorie surplus with nutrient-dense foods and strength training to build lean mass.'; }
-  else if (bmi < 25)   { cat='Normal weight'; advice='You are in a healthy range. Keep up balanced nutrition and consistent training.'; }
-  else if (bmi < 30)   { cat='Overweight'; advice='A moderate calorie deficit (300–500 kcal/day) with cardio and strength training will help.'; }
-  else                  { cat='Obese'; advice='Consult a doctor before starting. Low-impact exercise (walking, swimming) and structured nutrition is a solid starting point.'; }
+// ── PDF Download ─────────────────────────────────────────────────────────────
+function downloadPDF(wrapId, contentId, btnEl) {
+  const content = document.getElementById(contentId);
+  if (!content || !content.innerHTML.trim()) { alert('Generate a plan first.'); return; }
 
-  explain.textContent = `BMI category: ${cat}. ${advice}${tdee ? ` Your TDEE is ${Math.round(tdee)} kcal/day — eat below this to lose weight, above to gain.` : ''}`;
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner" style="border-top-color:var(--brand);border-color:rgba(232,80,10,0.2);"></span> Exporting…`;
+
+  // Build self-contained clone with all styles inlined
+  const clone = content.cloneNode(true);
+  const styles = `
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+      body{color:#1a1a1a;font-size:13px;}
+      .plan-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+      .sum-card{border:1px solid #e5e3df;border-radius:8px;padding:12px;text-align:center;}
+      .sum-val{font-size:18px;font-weight:700;color:#E8500A;}
+      .sum-lbl{font-size:10px;color:#999;margin-top:3px;text-transform:uppercase;letter-spacing:.04em;}
+      .day-card{border:1px solid #e5e3df;border-radius:10px;margin-bottom:14px;overflow:hidden;page-break-inside:avoid;}
+      .day-hdr{background:#0F172A;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;}
+      .day-badge{background:#E8500A;color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;text-transform:uppercase;}
+      .day-title{font-size:13px;font-weight:600;color:#fff;}
+      .day-sub{font-size:11px;color:#94a3b8;margin-left:auto;}
+      .plan-table{width:100%;border-collapse:collapse;font-size:12px;}
+      .plan-table thead tr{background:#f8f7f5;border-bottom:2px solid #E8500A;}
+      .plan-table thead th{padding:8px 12px;text-align:left;font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;}
+      .plan-table tbody tr{border-bottom:1px solid #e5e3df;}
+      .plan-table tbody tr:last-child{border-bottom:none;}
+      .plan-table td{padding:9px 12px;vertical-align:top;line-height:1.5;}
+      .meal-name{font-weight:700;color:#C13E06;display:block;}
+      .meal-time{font-size:10px;color:#999;}
+      .meal-macro{text-align:center;font-size:11px;color:#555;}
+      .meal-cal{text-align:right;font-weight:700;color:#0F172A;}
+      .total-row{background:#0F172A!important;}
+      .total-row td{color:#fff!important;font-weight:700;padding:8px 12px;}
+      .total-row td:first-child{color:#94a3b8!important;}
+      .ex-name{font-weight:700;color:#0F172A;}
+      .ex-sets{text-align:center;font-weight:700;color:#E8500A;}
+      .ex-reps,.ex-rest{text-align:center;}
+      .ex-tip{font-size:11px;color:#777;font-style:italic;}
+      .warmup-bar,.cooldown-bar{display:flex;gap:8px;padding:7px 12px;border-bottom:1px solid #e5e3df;font-size:11px;color:#555;}
+      .bar-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+      .warmup-bar .bar-label{color:#16A34A;}
+      .cooldown-bar .bar-label{color:#0369A1;}
+      .cooldown-bar{border-top:1px solid #e5e3df;border-bottom:none;}
+      .overload-box{background:#FDF0EB;border:1px solid #f5c0a4;border-radius:8px;padding:12px 14px;font-size:12px;color:#C13E06;margin-top:12px;}
+      .ob-label{font-size:10px;font-weight:700;color:#E8500A;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+      .form-tips-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+      .ftip-card{background:#E0F2FE;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;}
+      .ftip-ex{font-size:10px;font-weight:700;color:#0369A1;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+      .ftip-text{font-size:12px;color:#075985;line-height:1.5;}
+      .tips-section{margin-top:12px;}
+      .tips-heading{font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;}
+      .tips-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+      .tip-card{background:#DCFCE7;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;}
+      .tip-num{font-size:9px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+      .tip-card p{font-size:12px;color:#166534;line-height:1.5;}
+    </style>`;
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = styles;
+  wrapper.appendChild(clone);
+
+  const isWorkout = contentId.includes('workout');
+  html2pdf().set({
+    margin: [12, 12, 12, 12],
+    filename: isWorkout ? 'workout-plan.pdf' : 'diet-plan.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'avoid-all'] },
+  }).from(wrapper).save().then(() => {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> PDF`;
+  });
 }
