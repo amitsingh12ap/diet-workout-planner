@@ -1,7 +1,41 @@
-// ─── Config ───────────────────────────────────────────────────────────────────
-// Set your Anthropic API key here or via environment variable
-// For production, use a backend proxy — never expose keys in client-side code
-const API_KEY = window.ANTHROPIC_API_KEY || 'YOUR_API_KEY_HERE';
+// ─── API Key management ───────────────────────────────────────────────────────
+function getApiKey() {
+  return localStorage.getItem('anthropic_api_key') || '';
+}
+
+function saveApiKey(key) {
+  localStorage.setItem('anthropic_api_key', key.trim());
+}
+
+function checkApiKey() {
+  const key = getApiKey();
+  const banner = document.getElementById('api-key-banner');
+  const mainContent = document.getElementById('main-content');
+  if (!key) {
+    banner.style.display = '';
+    mainContent.style.display = 'none';
+  } else {
+    banner.style.display = 'none';
+    mainContent.style.display = '';
+  }
+}
+
+function submitApiKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val.startsWith('sk-ant-')) {
+    document.getElementById('api-key-error').textContent = 'That doesn\'t look like an Anthropic key (should start with sk-ant-).';
+    return;
+  }
+  saveApiKey(val);
+  checkApiKey();
+}
+
+function clearApiKey() {
+  localStorage.removeItem('anthropic_api_key');
+  checkApiKey();
+}
+
+window.addEventListener('DOMContentLoaded', checkApiKey);
 
 // ─── Chip state ───────────────────────────────────────────────────────────────
 const chipState = {};
@@ -53,7 +87,7 @@ async function callClaude(systemPrompt, userPrompt, outId) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
+        'x-api-key': getApiKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
