@@ -1,0 +1,142 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f5f5f3;
+  color: #1a1a1a;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
+
+.app {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.header { margin-bottom: 1.5rem; }
+.header h1 { font-size: 26px; font-weight: 500; margin-bottom: 4px; }
+.header p { font-size: 14px; color: #666; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+.tab {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  transition: all 0.15s;
+}
+.tab.active {
+  background: #fff;
+  color: #1a1a1a;
+  font-weight: 500;
+  border-color: #bbb;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e8e8e6;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; color: #555; }
+.field input, .field select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  background: #fafafa;
+  color: #1a1a1a;
+  font-size: 14px;
+  outline: none;
+}
+.field input:focus, .field select:focus { border-color: #1D9E75; }
+
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #1D9E75;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #0F6E56; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.output {
+  border: 1px solid #e8e8e6;
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: #fafafa;
+  min-height: 80px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+  margin-top: 1rem;
+}
+.output.empty { color: #aaa; font-style: italic; }
+
+.metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
+.metric { background: #f5f5f3; border-radius: 8px; padding: 12px; text-align: center; }
+.metric .val { font-size: 22px; font-weight: 500; }
+.metric .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip {
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid #ddd;
+  font-size: 13px;
+  cursor: pointer;
+  background: transparent;
+  color: #555;
+  transition: all 0.15s;
+}
+.chip.on {
+  background: #E1F5EE;
+  border-color: #1D9E75;
+  color: #085041;
+  font-weight: 500;
+}
+
+#bmi-explain { font-size: 14px; line-height: 1.7; color: #555; }
+
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 480px) {
+  .form-row { grid-template-columns: 1fr; }
+  .form-row.three { grid-template-columns: 1fr 1fr; }
+  .tabs { flex-wrap: wrap; }
+}

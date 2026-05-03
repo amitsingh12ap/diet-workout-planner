@@ -1,0 +1,15 @@
+# API keys
+.env
+.env.local
+*.env
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# node (if you add a proxy server later)
+node_modules/

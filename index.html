@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diet & Workout Planner</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <h1>Your fitness planner</h1>
+      <p>AI-powered diet & workout plans tailored to your body and goals.</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('diet', this)">Diet plan</button>
+      <button class="tab" onclick="switchTab('workout', this)">Workout plan</button>
+      <button class="tab" onclick="switchTab('bmi', this)">BMI & calories</button>
+    </div>
+
+    <!-- DIET TAB -->
+    <div id="tab-diet">
+      <div class="card">
+        <div class="section-label">Your profile</div>
+        <div class="form-row">
+          <div class="field"><label>Age</label><input id="d-age" type="number" placeholder="e.g. 30" /></div>
+          <div class="field"><label>Weight (kg)</label><input id="d-weight" type="number" placeholder="e.g. 75" /></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Height (cm)</label><input id="d-height" type="number" placeholder="e.g. 175" /></div>
+          <div class="field"><label>Gender</label>
+            <select id="d-gender"><option value="">Select</option><option>Male</option><option>Female</option></select>
+          </div>
+        </div>
+        <div class="section-label">Goal</div>
+        <div class="chip-row" id="d-goal-chips">
+          <button class="chip" onclick="toggleChip(this,'d-goal')">Weight loss</button>
+          <button class="chip" onclick="toggleChip(this,'d-goal')">Muscle gain</button>
+          <button class="chip" onclick="toggleChip(this,'d-goal')">Maintenance</button>
+          <button class="chip" onclick="toggleChip(this,'d-goal')">Endurance</button>
+        </div>
+        <div class="section-label">Dietary preferences</div>
+        <div class="chip-row" id="d-pref-chips">
+          <button class="chip" onclick="toggleChip(this,'d-pref')">Vegetarian</button>
+          <button class="chip" onclick="toggleChip(this,'d-pref')">Vegan</button>
+          <button class="chip" onclick="toggleChip(this,'d-pref')">Non-veg</button>
+          <button class="chip" onclick="toggleChip(this,'d-pref')">Gluten-free</button>
+          <button class="chip" onclick="toggleChip(this,'d-pref')">Low-carb</button>
+          <button class="chip" onclick="toggleChip(this,'d-pref')">High-protein</button>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Allergies / foods to avoid (optional)</label>
+          <input id="d-allergies" type="text" placeholder="e.g. dairy, nuts, shellfish" />
+        </div>
+        <div class="field">
+          <label>Activity level</label>
+          <select id="d-activity">
+            <option value="">Select</option>
+            <option>Sedentary (desk job, little exercise)</option>
+            <option>Lightly active (1–3 days/week)</option>
+            <option>Moderately active (3–5 days/week)</option>
+            <option>Very active (6–7 days/week)</option>
+            <option>Athlete / physical job</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" id="diet-btn" onclick="generateDiet()">Generate my diet plan</button>
+      <div id="diet-output" class="output empty">Your personalized diet plan will appear here...</div>
+    </div>
+
+    <!-- WORKOUT TAB -->
+    <div id="tab-workout" style="display:none;">
+      <div class="card">
+        <div class="section-label">Your profile</div>
+        <div class="form-row">
+          <div class="field"><label>Age</label><input id="w-age" type="number" placeholder="e.g. 30" /></div>
+          <div class="field"><label>Weight (kg)</label><input id="w-weight" type="number" placeholder="e.g. 75" /></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Fitness level</label>
+            <select id="w-level"><option value="">Select</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
+          </div>
+          <div class="field"><label>Days per week</label>
+            <select id="w-days"><option value="">Select</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+          </div>
+        </div>
+        <div class="section-label">Workout goal</div>
+        <div class="chip-row" id="w-goal-chips">
+          <button class="chip" onclick="toggleChip(this,'w-goal')">Fat loss</button>
+          <button class="chip" onclick="toggleChip(this,'w-goal')">Muscle building</button>
+          <button class="chip" onclick="toggleChip(this,'w-goal')">Strength</button>
+          <button class="chip" onclick="toggleChip(this,'w-goal')">Endurance</button>
+          <button class="chip" onclick="toggleChip(this,'w-goal')">Flexibility</button>
+        </div>
+        <div class="section-label">Equipment available</div>
+        <div class="chip-row" id="w-equip-chips">
+          <button class="chip" onclick="toggleChip(this,'w-equip')">No equipment</button>
+          <button class="chip" onclick="toggleChip(this,'w-equip')">Dumbbells</button>
+          <button class="chip" onclick="toggleChip(this,'w-equip')">Barbell & plates</button>
+          <button class="chip" onclick="toggleChip(this,'w-equip')">Full gym</button>
+          <button class="chip" onclick="toggleChip(this,'w-equip')">Resistance bands</button>
+          <button class="chip" onclick="toggleChip(this,'w-equip')">Pull-up bar</button>
+        </div>
+        <div class="field">
+          <label>Any injuries or limitations? (optional)</label>
+          <input id="w-injury" type="text" placeholder="e.g. bad knees, shoulder injury" />
+        </div>
+      </div>
+      <button class="btn-primary" id="workout-btn" onclick="generateWorkout()">Generate my workout plan</button>
+      <div id="workout-output" class="output empty">Your personalized workout plan will appear here...</div>
+    </div>
+
+    <!-- BMI TAB -->
+    <div id="tab-bmi" style="display:none;">
+      <div class="card">
+        <div class="section-label">Calculate your numbers</div>
+        <div class="form-row three">
+          <div class="field"><label>Weight (kg)</label><input id="b-weight" type="number" placeholder="75" oninput="calcBMI()" /></div>
+          <div class="field"><label>Height (cm)</label><input id="b-height" type="number" placeholder="175" oninput="calcBMI()" /></div>
+          <div class="field"><label>Age</label><input id="b-age" type="number" placeholder="30" oninput="calcBMI()" /></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Gender</label>
+            <select id="b-gender" onchange="calcBMI()"><option value="">Select</option><option>Male</option><option>Female</option></select>
+          </div>
+          <div class="field"><label>Activity level</label>
+            <select id="b-activity" onchange="calcBMI()">
+              <option value="">Select</option>
+              <option value="1.2">Sedentary</option>
+              <option value="1.375">Lightly active</option>
+              <option value="1.55">Moderately active</option>
+              <option value="1.725">Very active</option>
+              <option value="1.9">Athlete</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="val" id="bmi-val">—</div><div class="lbl">BMI</div></div>
+        <div class="metric"><div class="val" id="bmr-val">—</div><div class="lbl">BMR (kcal/day)</div></div>
+        <div class="metric"><div class="val" id="tdee-val">—</div><div class="lbl">TDEE (kcal/day)</div></div>
+      </div>
+      <div class="card" id="bmi-detail" style="display:none;">
+        <div class="section-label">What this means</div>
+        <p id="bmi-explain"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
