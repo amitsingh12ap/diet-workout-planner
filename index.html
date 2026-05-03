@@ -98,7 +98,7 @@
 
     <!-- WORKOUT TAB -->
     <div id="tab-workout" style="display:none;">
-      <div class="card">
+      <div class="card" id="w-form-card">
         <div class="section-label">Your profile</div>
         <div class="form-row">
           <div class="field"><label>Age</label><input id="w-age" type="number" placeholder="e.g. 30" /></div>
@@ -135,7 +135,7 @@
         </div>
       </div>
       <button class="btn-primary" id="workout-btn" onclick="generateWorkout()">Generate my workout plan</button>
-      <div id="workout-output" class="output empty">Your personalized workout plan will appear here...</div>
+      <div id="workout-plan"></div>
     </div>
 
     <!-- BMI TAB -->
