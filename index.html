@@ -94,7 +94,7 @@
       </div>
       <div style="display:flex;gap:10px;margin-top:4px;">
         <button class="btn-primary" id="diet-btn" onclick="generateDiet()" style="flex:1;">Generate my diet plan</button>
-        <button class="btn-secondary" id="diet-pdf-btn" onclick="downloadPDF()" style="display:none;">Download PDF</button>
+        <button class="btn-secondary" onclick="downloadPDF()">Download PDF</button>
       </div>
       <div id="diet-output" class="output empty">Your personalized diet plan will appear here...</div>
     </div>
@@ -137,7 +137,10 @@
           <input id="w-injury" type="text" placeholder="e.g. bad knees, shoulder injury" />
         </div>
       </div>
-      <button class="btn-primary" id="workout-btn" onclick="generateWorkout()">Generate my workout plan</button>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn-primary" id="workout-btn" onclick="generateWorkout()" style="flex:1;">Generate my workout plan</button>
+        <button class="btn-secondary" onclick="downloadPDF()">Download PDF</button>
+      </div>
       <div id="workout-plan"></div>
     </div>
 

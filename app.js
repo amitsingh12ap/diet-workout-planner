@@ -103,7 +103,6 @@ Add a Total Calories row at the bottom of each table.`;
     const text = await callClaude(sys, prompt);
     out.className = 'output';
     out.innerHTML = marked.parse(text);
-    document.getElementById('diet-pdf-btn').style.display = '';
   } catch(e) {
     out.className = 'output';
     out.textContent = 'Error: ' + e.message;
@@ -179,7 +178,6 @@ function renderWorkoutPlan(plan) {
       <div class="plan-title">${plan.split || 'Weekly Plan'}</div>
       <div class="plan-meta">Goal: ${plan.goal || '—'}</div>
     </div>
-    <button class="btn-secondary" onclick="downloadPDF()">Download PDF</button>
   </div>`;
 
   // Day cards
