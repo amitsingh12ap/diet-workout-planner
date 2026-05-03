@@ -81,21 +81,31 @@ async function generateDiet() {
   const allergies = document.getElementById('d-allergies').value;
 
   const out = document.getElementById('diet-output');
-  out.classList.remove('empty');
-  out.textContent = 'Building your meal plan...';
+  out.className = 'output loading';
+  out.innerHTML = 'Building your meal plan...';
   setLoading('diet-btn', true);
 
   try {
-    const sys = `You are a certified nutritionist. Create practical 7-day diet plans.
-Use Indian-friendly foods. Format with clear meal sections per day.`;
+    const sys = `You are a certified nutritionist. Respond in clean markdown only.
+Use ## for each day heading (e.g. ## Day 1 — Monday).
+For each day, output a markdown table with columns: Meal | Details | Calories.
+End with a ## Tips section as a bullet list. No extra commentary.
+Use Indian-friendly foods.`;
+
     const prompt = `Create a 7-day diet plan for:
 - Age: ${age||'N/A'}, Weight: ${weight||'N/A'} kg, Height: ${height||'N/A'} cm, Gender: ${gender||'N/A'}
 - Activity: ${activity||'moderate'}, Goal: ${goal||'general health'}
 - Preferences: ${pref||'none'}, Avoid: ${allergies||'none'}
-Include breakfast, lunch, dinner, snacks per day with calories. Add 3 tips at end.`;
+
+For each day include: Breakfast, Mid-morning snack, Lunch, Afternoon snack, Dinner.
+Add a Total Calories row at the bottom of each table.`;
+
     const text = await callClaude(sys, prompt);
-    out.textContent = text;
+    out.className = 'output';
+    out.innerHTML = marked.parse(text);
+    document.getElementById('diet-pdf-btn').style.display = '';
   } catch(e) {
+    out.className = 'output';
     out.textContent = 'Error: ' + e.message;
   }
   setLoading('diet-btn', false, 'Generate my diet plan');

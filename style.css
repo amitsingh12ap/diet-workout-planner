@@ -103,9 +103,46 @@ body {
   border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 1.25rem; background: var(--surface);
   min-height: 80px; font-size: 14px; line-height: 1.8;
-  color: var(--text); white-space: pre-wrap; margin-top: 1rem;
+  color: var(--text); margin-top: 1rem;
 }
 .output.empty { color: var(--text-3); font-style: italic; }
+.output.loading { color: var(--text-3); font-style: italic; white-space: pre-wrap; }
+
+/* ── Diet markdown rendering ── */
+.output h2 {
+  font-size: 15px; font-weight: 700; color: var(--brand);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin: 1.5rem 0 0.5rem; padding-bottom: 6px;
+  border-bottom: 2px solid var(--brand-light);
+}
+.output h2:first-child { margin-top: 0; }
+.output h3 {
+  font-size: 13px; font-weight: 700; color: var(--navy);
+  text-transform: uppercase; letter-spacing: 0.04em; margin: 1rem 0 0.4rem;
+}
+.output p { margin-bottom: 0.6rem; font-size: 14px; line-height: 1.7; }
+.output ul, .output ol { padding-left: 1.25rem; margin-bottom: 0.75rem; }
+.output li { font-size: 14px; line-height: 1.7; margin-bottom: 2px; }
+.output strong { font-weight: 700; color: var(--navy); }
+.output hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+
+/* Diet table */
+.output table {
+  width: 100%; border-collapse: collapse;
+  margin: 0.5rem 0 1rem; font-size: 13px;
+}
+.output table thead tr { background: var(--navy); color: #fff; }
+.output table thead th {
+  padding: 9px 12px; text-align: left;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.output table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.output table tbody tr:last-child { border-bottom: none; }
+.output table tbody tr:hover { background: var(--brand-light); }
+.output table td { padding: 9px 12px; vertical-align: top; line-height: 1.5; }
+.output table td:first-child { font-weight: 600; color: var(--brand-dark); white-space: nowrap; }
+.output table td:last-child { text-align: right; font-weight: 700; color: var(--navy); white-space: nowrap; }
 
 /* ── Workout plan output ── */
 #workout-plan { margin-top: 1rem; display: none; }
@@ -205,12 +242,13 @@ body {
 @media print {
   body { background: #fff; padding: 0; font-size: 12px; }
   .app { max-width: 100%; }
-  .tabs, .card:has(select), #w-form-card,
-  .btn-primary, .btn-secondary, .plan-header .btn-secondary { display: none !important; }
+  .tabs, #w-form-card, #api-key-banner,
+  .btn-primary, .btn-secondary { display: none !important; }
   .day-header { background: #0F172A !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .day-badge  { background: #E8500A !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .output table thead tr { background: #0F172A !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ex-table thead tr { border-bottom: 2px solid #E8500A; }
-  .day-card { break-inside: avoid; }
+  .day-card, .output h2 { break-inside: avoid; }
 }
 
 /* ── Responsive ── */

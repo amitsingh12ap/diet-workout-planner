@@ -92,7 +92,10 @@
           </select>
         </div>
       </div>
-      <button class="btn-primary" id="diet-btn" onclick="generateDiet()">Generate my diet plan</button>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn-primary" id="diet-btn" onclick="generateDiet()" style="flex:1;">Generate my diet plan</button>
+        <button class="btn-secondary" id="diet-pdf-btn" onclick="downloadPDF()" style="display:none;">Download PDF</button>
+      </div>
       <div id="diet-output" class="output empty">Your personalized diet plan will appear here...</div>
     </div>
 
@@ -176,6 +179,7 @@
     </div> <!-- /main-content -->
   </div> <!-- /app -->
 
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
