@@ -239,9 +239,101 @@ function renderWorkoutPlan(plan) {
   el.innerHTML = html;
 }
 
-// ─── PDF download via browser print ──────────────────────────────────────────
+// ─── PDF download ─────────────────────────────────────────────────────────────
 function downloadPDF() {
-  window.print();
+  // Figure out which tab is active and grab the right content element
+  const isDiet    = document.getElementById('tab-diet').style.display    !== 'none';
+  const isWorkout = document.getElementById('tab-workout').style.display !== 'none';
+
+  const contentEl = isDiet    ? document.getElementById('diet-output')
+                  : isWorkout ? document.getElementById('workout-plan')
+                  : null;
+
+  if (!contentEl || contentEl.classList.contains('empty') || !contentEl.innerHTML.trim()) {
+    alert('Generate a plan first, then download.');
+    return;
+  }
+
+  const filename = isDiet ? 'diet-plan.pdf' : 'workout-plan.pdf';
+
+  // Clone so we can inject print-friendly styles without affecting the live UI
+  const clone = contentEl.cloneNode(true);
+  clone.style.cssText = 'font-family:-apple-system,sans-serif;font-size:13px;color:#1a1a1a;padding:8px;';
+
+  // Inline critical styles for tables (html2pdf renders in a headless context, CSS vars won't resolve)
+  clone.querySelectorAll('table').forEach(t => {
+    t.style.cssText = 'width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;';
+  });
+  clone.querySelectorAll('thead tr').forEach(tr => {
+    tr.style.cssText = 'background:#0F172A;color:#fff;';
+  });
+  clone.querySelectorAll('th').forEach(th => {
+    th.style.cssText = 'padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;';
+  });
+  clone.querySelectorAll('tbody tr').forEach((tr, i) => {
+    tr.style.cssText = `border-bottom:1px solid #e5e3df;background:${i % 2 === 0 ? '#fff' : '#f8f7f5'};`;
+  });
+  clone.querySelectorAll('td').forEach(td => {
+    td.style.cssText = 'padding:8px 10px;vertical-align:top;';
+  });
+  clone.querySelectorAll('td:first-child').forEach(td => {
+    td.style.cssText = 'padding:8px 10px;vertical-align:top;font-weight:700;color:#C13E06;';
+  });
+  clone.querySelectorAll('h2').forEach(h => {
+    h.style.cssText = 'font-size:14px;font-weight:700;color:#E8500A;text-transform:uppercase;letter-spacing:0.05em;margin:20px 0 6px;padding-bottom:5px;border-bottom:2px solid #FDF0EB;';
+  });
+  // Workout day cards
+  clone.querySelectorAll('.day-header').forEach(h => {
+    h.style.cssText = 'background:#0F172A;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;border-radius:8px 8px 0 0;';
+  });
+  clone.querySelectorAll('.day-badge').forEach(b => {
+    b.style.cssText = 'background:#E8500A;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;text-transform:uppercase;';
+  });
+  clone.querySelectorAll('.day-title').forEach(t => { t.style.cssText = 'font-size:13px;font-weight:600;color:#fff;'; });
+  clone.querySelectorAll('.day-focus').forEach(t => { t.style.cssText = 'font-size:11px;color:#aaa;margin-left:auto;'; });
+  clone.querySelectorAll('.day-card').forEach(c => {
+    c.style.cssText = 'border:1px solid #e5e3df;border-radius:10px;margin-bottom:14px;overflow:hidden;page-break-inside:avoid;';
+  });
+  clone.querySelectorAll('.day-body').forEach(b => { b.style.cssText = 'padding:0 14px 12px;'; });
+  clone.querySelectorAll('.ex-table').forEach(t => {
+    t.style.cssText = 'width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;';
+  });
+  clone.querySelectorAll('.ex-table thead th').forEach(th => {
+    th.style.cssText = 'text-align:left;padding:6px 8px;font-size:10px;font-weight:700;color:#555;text-transform:uppercase;border-bottom:2px solid #E8500A;';
+  });
+  clone.querySelectorAll('.ex-table tbody td').forEach(td => { td.style.cssText = 'padding:7px 8px;border-bottom:1px solid #e5e3df;font-size:12px;'; });
+  clone.querySelectorAll('.ex-name').forEach(t => { t.style.cssText = 'font-weight:700;color:#0F172A;padding:7px 8px;border-bottom:1px solid #e5e3df;'; });
+  clone.querySelectorAll('.ex-sets').forEach(t => { t.style.cssText = 'text-align:center;font-weight:700;color:#E8500A;padding:7px 8px;border-bottom:1px solid #e5e3df;'; });
+  clone.querySelectorAll('.warmup-row,.cooldown-row').forEach(r => {
+    r.style.cssText = 'font-size:11px;color:#555;padding:6px 0;border-bottom:1px solid #e5e3df;display:flex;gap:8px;';
+  });
+  clone.querySelectorAll('.overload-box').forEach(b => {
+    b.style.cssText = 'background:#FDF0EB;border:1px solid #f5c0a4;border-radius:8px;padding:10px 14px;font-size:12px;color:#C13E06;margin-top:6px;';
+  });
+  clone.querySelectorAll('.tips-grid').forEach(g => { g.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;'; });
+  clone.querySelectorAll('.tip-card').forEach(c => {
+    c.style.cssText = 'background:#DCFCE7;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px;';
+  });
+  clone.querySelectorAll('.tip-ex').forEach(t => { t.style.cssText = 'font-size:10px;font-weight:700;color:#16A34A;text-transform:uppercase;margin-bottom:3px;'; });
+  clone.querySelectorAll('.tip-text').forEach(t => { t.style.cssText = 'font-size:11px;color:#166534;line-height:1.5;'; });
+
+  const opt = {
+    margin:      [10, 10, 10, 10],
+    filename,
+    image:       { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:   { mode: ['avoid-all', 'css'] },
+  };
+
+  const btn = event.currentTarget;
+  btn.textContent = 'Generating...';
+  btn.disabled = true;
+
+  html2pdf().set(opt).from(clone).save().then(() => {
+    btn.textContent = 'Download PDF';
+    btn.disabled = false;
+  });
 }
 
 // ─── BMI calculator ───────────────────────────────────────────────────────────
