@@ -45,15 +45,51 @@ async function callClaude(system, prompt) {
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 2000, system, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 4096, system, messages: [{ role: 'user', content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   return data.content?.find(b => b.type === 'text')?.text || '';
 }
 
+// Robust JSON extractor — strips fences, finds outermost { }, handles truncation
 function parseJSON(raw) {
-  return JSON.parse(raw.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim());
+  // Strip markdown fences
+  let s = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  // Find the outermost JSON object
+  const start = s.indexOf('{');
+  if (start === -1) throw new Error('No JSON object found in response');
+  // Walk to find matching closing brace, tolerating truncation
+  let depth = 0, end = -1;
+  for (let i = start; i < s.length; i++) {
+    if (s[i] === '{') depth++;
+    else if (s[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  // If truncated, attempt to close open braces/brackets
+  if (end === -1) {
+    let fragment = s.slice(start);
+    // Count unclosed braces and brackets
+    let braces = 0, brackets = 0;
+    let inStr = false, escape = false;
+    for (const ch of fragment) {
+      if (escape) { escape = false; continue; }
+      if (ch === '\\') { escape = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{') braces++;
+      else if (ch === '}') braces--;
+      else if (ch === '[') brackets++;
+      else if (ch === ']') brackets--;
+    }
+    // Remove trailing incomplete key/value then close structures
+    fragment = fragment.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
+    fragment = fragment.replace(/,\s*"[^"]*"\s*$/, '');
+    fragment += ']'.repeat(Math.max(0, brackets)) + '}'.repeat(Math.max(0, braces));
+    s = fragment;
+  } else {
+    s = s.slice(start, end + 1);
+  }
+  return JSON.parse(s);
 }
 
 // ── Generate Diet Plan ───────────────────────────────────────────────────────
@@ -65,21 +101,7 @@ async function generateDiet() {
   document.getElementById('diet-empty').style.display = '';
   document.getElementById('diet-empty').textContent   = 'Building your 7-day meal plan…';
 
-  const schema = `{
-  "goal": "...", "daily_calories": 1800, "protein_g": 140, "carbs_g": 180, "fat_g": 60,
-  "days": [{
-    "day": "Day 1", "title": "Monday",
-    "meals": [
-      { "meal": "Breakfast", "time": "8:00 AM", "items": "...", "calories": 380, "protein": "15g", "carbs": "50g", "fat": "10g" },
-      { "meal": "Mid-morning", "time": "11:00 AM", "items": "...", "calories": 150, "protein": "4g", "carbs": "20g", "fat": "5g" },
-      { "meal": "Lunch", "time": "1:00 PM", "items": "...", "calories": 500, "protein": "35g", "carbs": "55g", "fat": "15g" },
-      { "meal": "Snack", "time": "4:30 PM", "items": "...", "calories": 180, "protein": "8g", "carbs": "20g", "fat": "6g" },
-      { "meal": "Dinner", "time": "7:30 PM", "items": "...", "calories": 450, "protein": "30g", "carbs": "40g", "fat": "14g" }
-    ],
-    "total_calories": 1660, "water": "10 glasses"
-  }],
-  "tips": ["tip 1", "tip 2", "tip 3", "tip 4"]
-}`;
+  const schema = `{"goal":"...","daily_calories":1800,"protein_g":140,"carbs_g":180,"fat_g":60,"days":[{"day":"Day 1","title":"Monday","meals":[{"meal":"Breakfast","time":"8:00 AM","items":"...","calories":380},{"meal":"Mid-morning","time":"11:00 AM","items":"...","calories":150},{"meal":"Lunch","time":"1:00 PM","items":"...","calories":500},{"meal":"Snack","time":"4:30 PM","items":"...","calories":180},{"meal":"Dinner","time":"7:30 PM","items":"...","calories":450}],"total_calories":1660,"water":"10 glasses"}],"tips":["tip 1","tip 2","tip 3"]}`;
 
   try {
     const text = await callClaude(
@@ -122,12 +144,9 @@ function renderDietPlan(plan) {
       <div class="day-body">
         <table class="plan-table">
           <thead><tr>
-            <th style="width:18%">Meal</th>
-            <th style="width:38%">What to eat</th>
-            <th style="width:10%">Protein</th>
-            <th style="width:10%">Carbs</th>
-            <th style="width:10%">Fat</th>
-            <th style="width:12%">Kcal</th>
+            <th style="width:20%">Meal</th>
+            <th style="width:65%">What to eat</th>
+            <th style="width:15%">Kcal</th>
           </tr></thead>
           <tbody>`;
 
@@ -135,9 +154,6 @@ function renderDietPlan(plan) {
       html += `<tr>
         <td><span class="meal-name">${m.meal}</span><span class="meal-time">${m.time||''}</span></td>
         <td class="meal-items">${m.items}</td>
-        <td class="meal-macro">${m.protein||'—'}</td>
-        <td class="meal-macro">${m.carbs||'—'}</td>
-        <td class="meal-macro">${m.fat||'—'}</td>
         <td class="meal-cal">${m.calories||'—'}</td>
       </tr>`;
     });
@@ -172,19 +188,7 @@ async function generateWorkout() {
   document.getElementById('workout-empty').style.display    = '';
   document.getElementById('workout-empty').textContent      = 'Building your workout split…';
 
-  const schema = `{
-  "split": "Push/Pull/Legs", "goal": "...", "days_per_week": 4,
-  "days": [{
-    "day": "Day 1", "title": "Push — Chest & Shoulders", "focus": "Chest, Shoulders, Triceps",
-    "warmup": "5 min light cardio + arm circles",
-    "exercises": [
-      { "name": "Bench Press", "sets": 4, "reps": "8-10", "rest": "90s", "tip": "Keep shoulder blades retracted" }
-    ],
-    "cooldown": "5 min static stretching"
-  }],
-  "form_tips": [{ "exercise": "Squat", "tip": "Keep chest tall, knees tracking over toes" }],
-  "overload_tip": "Add 2.5kg or 1 extra rep each week on main lifts."
-}`;
+  const schema = `{"split":"Push/Pull/Legs","goal":"...","days_per_week":4,"days":[{"day":"Day 1","title":"Push — Chest & Shoulders","focus":"Chest, Shoulders, Triceps","warmup":"5 min light cardio","exercises":[{"name":"Bench Press","sets":4,"reps":"8-10","rest":"90s","tip":"Retract shoulder blades"}],"cooldown":"5 min stretching"}],"form_tips":[{"exercise":"Squat","tip":"Chest tall, knees over toes"}],"overload_tip":"Add 2.5kg or 1 rep each week."}`;
 
   try {
     const text = await callClaude(
