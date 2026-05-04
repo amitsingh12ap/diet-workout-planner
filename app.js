@@ -52,68 +52,98 @@ async function callClaude(system, prompt) {
   return data.content?.find(b => b.type === 'text')?.text || '';
 }
 
-// Robust JSON extractor — strips fences, finds outermost { }, handles truncation
+// Robust JSON extractor — handles truncation, unterminated strings, open brackets
 function parseJSON(raw) {
-  // Strip markdown fences
   let s = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-  // Find the outermost JSON object
   const start = s.indexOf('{');
-  if (start === -1) throw new Error('No JSON object found in response');
-  // Walk to find matching closing brace, tolerating truncation
-  let depth = 0, end = -1;
-  for (let i = start; i < s.length; i++) {
-    if (s[i] === '{') depth++;
-    else if (s[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  if (start === -1) throw new Error('No JSON found in response');
+  s = s.slice(start);
+
+  // Walk char by char tracking state
+  let depth = 0, inStr = false, escape = false, end = -1;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape)          { escape = false; continue; }
+    if (ch === '\\' && inStr) { escape = true; continue; }
+    if (ch === '"')      { inStr = !inStr; continue; }
+    if (inStr)           continue;
+    if (ch === '{')      depth++;
+    else if (ch === '}') { depth--; if (depth === 0) { end = i; break; } }
   }
-  // If truncated, attempt to close open braces/brackets
-  if (end === -1) {
-    let fragment = s.slice(start);
-    // Count unclosed braces and brackets
-    let braces = 0, brackets = 0;
-    let inStr = false, escape = false;
-    for (const ch of fragment) {
-      if (escape) { escape = false; continue; }
-      if (ch === '\\') { escape = true; continue; }
-      if (ch === '"') { inStr = !inStr; continue; }
-      if (inStr) continue;
-      if (ch === '{') braces++;
-      else if (ch === '}') braces--;
-      else if (ch === '[') brackets++;
-      else if (ch === ']') brackets--;
-    }
-    // Remove trailing incomplete key/value then close structures
-    fragment = fragment.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
-    fragment = fragment.replace(/,\s*"[^"]*"\s*$/, '');
-    fragment += ']'.repeat(Math.max(0, brackets)) + '}'.repeat(Math.max(0, braces));
-    s = fragment;
-  } else {
-    s = s.slice(start, end + 1);
+
+  if (end !== -1) {
+    // Complete JSON found
+    try { return JSON.parse(s.slice(0, end + 1)); } catch(e) {}
   }
+
+  // Truncated — repair it
+  // 1. Close any open string
+  if (inStr) s += '"';
+  // 2. Strip trailing incomplete key or value after last comma
+  s = s.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, '');  // cut incomplete string value
+  s = s.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, ''); // cut incomplete scalar value
+  s = s.replace(/,\s*"[^"]*"\s*$/, '');              // cut incomplete key
+  s = s.replace(/,\s*$/, '');                         // trailing comma
+
+  // 3. Count unclosed brackets/braces
+  let braces = 0, brackets = 0;
+  inStr = false; escape = false;
+  for (const ch of s) {
+    if (escape)          { escape = false; continue; }
+    if (ch === '\\' && inStr) { escape = true; continue; }
+    if (ch === '"')      { inStr = !inStr; continue; }
+    if (inStr)           continue;
+    if (ch === '{')      braces++;
+    else if (ch === '}') braces--;
+    else if (ch === '[') brackets++;
+    else if (ch === ']') brackets--;
+  }
+
+  // 4. Close structures
+  s += ']'.repeat(Math.max(0, brackets)) + '}'.repeat(Math.max(0, braces));
+
   return JSON.parse(s);
 }
 
-// ── Generate Diet Plan ───────────────────────────────────────────────────────
+// ── Generate Diet Plan (2 calls: days 1-4, days 5-7) ────────────────────────
 async function generateDiet() {
   const btn = document.getElementById('diet-btn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Generating…';
   document.getElementById('diet-plan').style.display  = 'none';
   document.getElementById('diet-empty').style.display = '';
-  document.getElementById('diet-empty').textContent   = 'Building your 7-day meal plan…';
 
-  const schema = `{"goal":"...","daily_calories":1800,"protein_g":140,"carbs_g":180,"fat_g":60,"days":[{"day":"Day 1","title":"Monday","meals":[{"meal":"Breakfast","time":"8:00 AM","items":"...","calories":380},{"meal":"Mid-morning","time":"11:00 AM","items":"...","calories":150},{"meal":"Lunch","time":"1:00 PM","items":"...","calories":500},{"meal":"Snack","time":"4:30 PM","items":"...","calories":180},{"meal":"Dinner","time":"7:30 PM","items":"...","calories":450}],"total_calories":1660,"water":"10 glasses"}],"tips":["tip 1","tip 2","tip 3"]}`;
+  const age      = document.getElementById('d-age').value      || 'N/A';
+  const weight   = document.getElementById('d-weight').value   || 'N/A';
+  const height   = document.getElementById('d-height').value   || 'N/A';
+  const gender   = document.getElementById('d-gender').value   || 'N/A';
+  const activity = document.getElementById('d-activity').value || 'moderate';
+  const goal     = getChips('d-goal') || 'general health';
+  const pref     = getChips('d-pref') || 'none';
+  const avoid    = document.getElementById('d-allergies').value || 'none';
+
+  const profile = `Age:${age}, Weight:${weight}kg, Height:${height}cm, Gender:${gender}, Activity:${activity}, Goal:${goal}, Preferences:${pref}, Avoid:${avoid}`;
+  const daySchema = `{"day":"Day N","title":"Weekday","meals":[{"meal":"Breakfast","time":"8:00 AM","items":"...","calories":380},{"meal":"Mid-morning","time":"11:00 AM","items":"...","calories":150},{"meal":"Lunch","time":"1:00 PM","items":"...","calories":500},{"meal":"Snack","time":"4:30 PM","items":"...","calories":180},{"meal":"Dinner","time":"7:30 PM","items":"...","calories":450}],"total_calories":1660,"water":"10 glasses"}`;
+  const sys = 'You are a certified nutritionist. Respond ONLY with a valid JSON array. No markdown, no extra text. Use Indian-friendly foods. Keep meal item descriptions under 15 words each.';
 
   try {
-    const text = await callClaude(
-      'You are a certified nutritionist. Respond ONLY with valid JSON matching the schema. No markdown fences, no extra text. Use Indian-friendly foods.',
-      `Create a 7-day diet plan for:
-Age: ${document.getElementById('d-age').value||'N/A'}, Weight: ${document.getElementById('d-weight').value||'N/A'}kg,
-Height: ${document.getElementById('d-height').value||'N/A'}cm, Gender: ${document.getElementById('d-gender').value||'N/A'},
-Activity: ${document.getElementById('d-activity').value||'moderate'}, Goal: ${getChips('d-goal')||'general health'},
-Preferences: ${getChips('d-pref')||'none'}, Avoid: ${document.getElementById('d-allergies').value||'none'}.
-Schema: ${schema}`
-    );
-    const plan = parseJSON(text);
+    btn.innerHTML = '<span class="spinner"></span>Days 1–4…';
+    const raw1 = await callClaude(sys,
+      `Create days 1-4 of a 7-day diet plan for: ${profile}.\nRespond with a JSON array of 4 day objects matching this schema: [${daySchema}, ...]\nNo wrapper object, just the array.`);
+
+    btn.innerHTML = '<span class="spinner"></span>Days 5–7…';
+    const raw2 = await callClaude(sys,
+      `Create days 5-7 of a 7-day diet plan for: ${profile}.\nRespond with a JSON array of 3 day objects matching this schema: [${daySchema}, ...]\nNo wrapper object, just the array.`);
+
+    const days1 = parseJSONArray(raw1);
+    const days2 = parseJSONArray(raw2);
+
+    const plan = {
+      goal, daily_calories: Math.round(weight * 30), protein_g: Math.round(weight * 1.8),
+      carbs_g: Math.round(weight * 2.5), fat_g: Math.round(weight * 0.8),
+      days: [...days1, ...days2],
+      tips: ['Drink at least 8–10 glasses of water daily.','Eat slowly and stop at 80% full.','Prep meals in advance to stay consistent.']
+    };
+
     renderDietPlan(plan);
     document.getElementById('diet-empty').style.display = 'none';
     document.getElementById('diet-plan').style.display  = '';
@@ -179,27 +209,96 @@ function renderDietPlan(plan) {
   wrap.innerHTML = html;
 }
 
-// ── Generate Workout Plan ────────────────────────────────────────────────────
+// Parse a JSON array response (same repair logic)
+function parseJSONArray(raw) {
+  let s = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  // If wrapped in object, extract days array
+  if (s.startsWith('{')) { try { const o = parseJSON(s); return o.days || o; } catch(e) {} }
+  const start = s.indexOf('[');
+  if (start === -1) return [];
+  s = s.slice(start);
+
+  let depth = 0, inStr = false, escape = false, end = -1;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape)               { escape = false; continue; }
+    if (ch === '\\' && inStr) { escape = true; continue; }
+    if (ch === '"')           { inStr = !inStr; continue; }
+    if (inStr)                continue;
+    if (ch === '[')           depth++;
+    else if (ch === ']')      { depth--; if (depth === 0) { end = i; break; } }
+  }
+
+  if (end !== -1) { try { return JSON.parse(s.slice(0, end + 1)); } catch(e) {} }
+
+  // Repair truncated array
+  if (inStr) s += '"';
+  s = s.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, '');
+  s = s.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
+  s = s.replace(/,\s*"[^"]*"\s*$/, '');
+  s = s.replace(/,\s*$/, '');
+
+  let braces = 0, brackets = 0;
+  inStr = false; escape = false;
+  for (const ch of s) {
+    if (escape)               { escape = false; continue; }
+    if (ch === '\\' && inStr) { escape = true; continue; }
+    if (ch === '"')           { inStr = !inStr; continue; }
+    if (inStr)                continue;
+    if (ch === '{')      braces++;
+    else if (ch === '}') braces--;
+    else if (ch === '[') brackets++;
+    else if (ch === ']') brackets--;
+  }
+  s += '}'.repeat(Math.max(0, braces)) + ']'.repeat(Math.max(0, brackets));
+  return JSON.parse(s);
+}
+
+// ── Generate Workout Plan (2 calls: first half, second half) ─────────────────
 async function generateWorkout() {
   const btn = document.getElementById('workout-btn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Generating…';
   document.getElementById('workout-plan-pdf').style.display = 'none';
   document.getElementById('workout-empty').style.display    = '';
-  document.getElementById('workout-empty').textContent      = 'Building your workout split…';
 
-  const schema = `{"split":"Push/Pull/Legs","goal":"...","days_per_week":4,"days":[{"day":"Day 1","title":"Push — Chest & Shoulders","focus":"Chest, Shoulders, Triceps","warmup":"5 min light cardio","exercises":[{"name":"Bench Press","sets":4,"reps":"8-10","rest":"90s","tip":"Retract shoulder blades"}],"cooldown":"5 min stretching"}],"form_tips":[{"exercise":"Squat","tip":"Chest tall, knees over toes"}],"overload_tip":"Add 2.5kg or 1 rep each week."}`;
+  const age    = document.getElementById('w-age').value    || 'N/A';
+  const weight = document.getElementById('w-weight').value || 'N/A';
+  const level  = document.getElementById('w-level').value  || 'intermediate';
+  const days   = parseInt(document.getElementById('w-days').value) || 4;
+  const goal   = getChips('w-goal')  || 'general fitness';
+  const equip  = getChips('w-equip') || 'full gym';
+  const injury = document.getElementById('w-injury').value || 'none';
+
+  const profile = `Age:${age}, Weight:${weight}kg, Level:${level}, Goal:${goal}, Equipment:${equip}, Injuries:${injury}`;
+  const exSchema = `{"name":"Exercise","sets":3,"reps":"10-12","rest":"60s","tip":"Short tip"}`;
+  const daySchema = `{"day":"Day N","title":"Focus Area","focus":"Muscles","warmup":"5 min cardio","exercises":[${exSchema}],"cooldown":"5 min stretch"}`;
+  const sys = 'You are a certified personal trainer. Respond ONLY with a valid JSON array. No markdown, no extra text. Keep tips under 8 words.';
+
+  const half1 = Math.ceil(days / 2);
+  const half2 = days - half1;
 
   try {
-    const text = await callClaude(
-      'You are a certified personal trainer. Respond ONLY with valid JSON matching the schema. No markdown, no extra text.',
-      `Create a ${document.getElementById('w-days').value||4}-day/week workout plan for:
-Age: ${document.getElementById('w-age').value||'N/A'}, Weight: ${document.getElementById('w-weight').value||'N/A'}kg,
-Level: ${document.getElementById('w-level').value||'intermediate'}, Goal: ${getChips('w-goal')||'general fitness'},
-Equipment: ${getChips('w-equip')||'full gym'}, Injuries: ${document.getElementById('w-injury').value||'none'}.
-Schema: ${schema}`
-    );
-    const plan = parseJSON(text);
+    btn.innerHTML = `<span class="spinner"></span>Days 1–${half1}…`;
+    const raw1 = await callClaude(sys,
+      `Create days 1-${half1} of a ${days}-day/week workout plan for: ${profile}.\nRespond with a JSON array of ${half1} day objects: [${daySchema}, ...]\nNo wrapper object.`);
+
+    let days2Arr = [];
+    if (half2 > 0) {
+      btn.innerHTML = `<span class="spinner"></span>Days ${half1+1}–${days}…`;
+      const raw2 = await callClaude(sys,
+        `Create days ${half1+1}-${days} of a ${days}-day/week workout plan for: ${profile}.\nRespond with a JSON array of ${half2} day objects: [${daySchema}, ...]\nNo wrapper object.`);
+      days2Arr = parseJSONArray(raw2);
+    }
+
+    const days1Arr = parseJSONArray(raw1);
+    const plan = {
+      split: goal.includes('Push') ? 'Push/Pull/Legs' : goal.includes('Muscle') ? 'Upper/Lower' : 'Full Body Split',
+      goal, days_per_week: days,
+      days: [...days1Arr, ...days2Arr],
+      form_tips: [{ exercise: 'Compound lifts', tip: 'Control the eccentric (lowering) phase.' }],
+      overload_tip: 'Add 2.5kg or 1 extra rep each week on your main lifts.'
+    };
+
     renderWorkoutPlan(plan);
     document.getElementById('workout-empty').style.display    = 'none';
     document.getElementById('workout-plan-pdf').style.display = '';
