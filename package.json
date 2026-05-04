@@ -1,0 +1,12 @@
+{
+  "name": "diet-workout-planner",
+  "version": "1.0.0",
+  "description": "AI-powered diet & workout planner",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
