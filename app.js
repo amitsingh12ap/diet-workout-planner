@@ -1,22 +1,3 @@
-// ── API Key ──────────────────────────────────────────────────────────────────
-function getApiKey() { return localStorage.getItem('anthropic_api_key') || ''; }
-function saveApiKey(k) { localStorage.setItem('anthropic_api_key', k.trim()); }
-function checkApiKey() {
-  const ok = !!getApiKey();
-  document.getElementById('api-key-banner').style.display = ok ? 'none' : '';
-  document.getElementById('main-content').style.display   = ok ? ''     : 'none';
-}
-function submitApiKey() {
-  const v = document.getElementById('api-key-input').value.trim();
-  if (!v.startsWith('sk-ant-')) {
-    document.getElementById('api-key-error').textContent = "Doesn't look right — key should start with sk-ant-";
-    return;
-  }
-  saveApiKey(v); checkApiKey();
-}
-function clearApiKey() { localStorage.removeItem('anthropic_api_key'); checkApiKey(); }
-window.addEventListener('DOMContentLoaded', checkApiKey);
-
 // ── Chips ────────────────────────────────────────────────────────────────────
 const chipState = {};
 function toggleChip(el, g) {
@@ -35,17 +16,17 @@ function switchTab(name, btn) {
     document.getElementById('tab-'+t).style.display = t === name ? '' : 'none');
 }
 
-// ── Claude call ──────────────────────────────────────────────────────────────
+// ── Claude call — goes through /api/proxy (key stays server-side) ────────────
 async function callClaude(system, prompt) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('/api/proxy', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': getApiKey(),
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 4096, system, messages: [{ role: 'user', content: prompt }] }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5',
+      max_tokens: 4096,
+      system,
+      messages: [{ role: 'user', content: prompt }],
+    }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);

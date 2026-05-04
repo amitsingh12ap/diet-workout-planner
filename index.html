@@ -9,33 +9,11 @@
 <body>
 <div class="app">
 
-  <!-- API Key Banner -->
-  <div id="api-key-banner" style="display:none;">
-    <div class="app-header">
-      <div><h1>Fitness Planner</h1><p>AI-powered diet & workout plans.</p></div>
-      <span class="header-badge">Powered by Claude</span>
-    </div>
-    <div class="key-banner-card">
-      <h2>Connect your AI</h2>
-      <p>This app runs entirely in your browser. Your key is stored locally on your device only — never sent anywhere except Anthropic's API.
-         Get a free key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.</p>
-      <div class="field" style="margin-bottom:10px;">
-        <label>Anthropic API Key</label>
-        <input id="api-key-input" type="password" placeholder="sk-ant-..." style="font-family:monospace;" />
-      </div>
-      <span id="api-key-error"></span>
-      <button class="btn-primary" style="margin-top:0;" onclick="submitApiKey()">Save & continue</button>
-    </div>
-  </div>
-
   <!-- Main App -->
-  <div id="main-content" style="display:none;">
+  <div id="main-content">
     <div class="app-header">
       <div><h1>Fitness Planner</h1><p>AI-powered diet & workout plans tailored to you.</p></div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-        <span class="header-badge">Powered by Claude</span>
-        <button onclick="clearApiKey()" style="font-size:11px;color:var(--text-3);background:none;border:none;cursor:pointer;">Change key</button>
-      </div>
+      <span class="header-badge">Powered by Claude</span>
     </div>
 
     <div class="tabs">
